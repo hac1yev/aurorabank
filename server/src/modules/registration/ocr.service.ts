@@ -29,6 +29,6 @@ export class OcrService {
 
     const text: string = result.data.text;
     const res = await this.aiService.extractPassportInfo(text);
-    return res;
+    return { ...res, public_id };
   }
 }

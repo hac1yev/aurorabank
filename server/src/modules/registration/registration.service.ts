@@ -50,25 +50,6 @@ export class RegistrationService {
     return { status: 'ok', registrationToken };
   }
 
-  async getPassportInfoFromOcr(
-    registrationToken: string,
-    files: UploadedFileLike[],
-  ) {
-    try {
-      const res = await this.ocrService.extractPassport(
-        registrationToken,
-        files,
-      );
-
-      return res;
-    } catch (error) {
-      throw new InternalServerErrorException(
-        error,
-        'Failed to extract passport information from OCR',
-      );
-    }
-  }
-
   async handleContactDetails(
     contactDetails: ContactDetailsDto,
     registrationToken: string,
@@ -120,6 +101,25 @@ export class RegistrationService {
     await this.consentService.storeAddressDetails(registrationToken, body);
 
     return { success: true, registrationToken };
+  }
+
+  async getPassportInfoFromOcr(
+    registrationToken: string,
+    files: UploadedFileLike[],
+  ) {
+    try {
+      const res = await this.ocrService.extractPassport(
+        registrationToken,
+        files,
+      );
+
+      return res;
+    } catch (error) {
+      throw new InternalServerErrorException(
+        error,
+        'Failed to extract passport information from OCR',
+      );
+    }
   }
 
   async verifyFaceRecognition(

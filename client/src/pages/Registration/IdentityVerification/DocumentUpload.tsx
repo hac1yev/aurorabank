@@ -6,9 +6,10 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 
 interface DocumentUploadProps {
   onContinue: (file: File) => void;
+  isUploadPending: boolean;
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPending }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -180,11 +181,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue }) => {
         fullWidth
         variant="contained"
         size="large"
-        disabled={!file}
+        disabled={!file || isUploadPending}
         onClick={handleContinue}
       >
         {" "}
-        Continue{" "}
+        {isUploadPending ? "Loading..." : "Continue"}
       </Button>{" "}
     </Stack>
   );

@@ -56,20 +56,6 @@ export class FaceRecognationService implements OnModuleInit {
       selfieResult.descriptor,
     );
 
-    console.log({
-      distance,
-      passportDetectionScore: passportResult.detection.score,
-      selfieDetectionScore: selfieResult.detection.score,
-      passportImageSize: {
-        width: passportImage.width,
-        height: passportImage.height,
-      },
-      selfieImageSize: {
-        width: selfieImage.width,
-        height: selfieImage.height,
-      },
-    });
-
     return {
       distance,
       matched: distance < 0.6,

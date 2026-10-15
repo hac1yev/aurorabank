@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 
@@ -6,74 +5,106 @@ import DocumentUpload from "./DocumentUpload";
 import FaceRecognation from "./FaceRecognation";
 import { useUploadDocumentMutation } from "../../../mutations/uploadDocument";
 import { useFaceRecognationMutation } from "../../../mutations/faceRecognation";
+import type { ComponentStepProps } from "../types";
+import VerificationSuccess from "./VerificationSuccess";
 
 type VerificationStep = "document" | "selfie";
 
-export type FaceDetectionWithExpressions =
-  faceapi.WithFaceExpressions<
-    faceapi.WithFaceLandmarks<
-      { detection: faceapi.FaceDetection },
-      faceapi.FaceLandmarks68
-    >
-  >;
+export type FaceDetectionWithExpressions = faceapi.WithFaceExpressions<
+  faceapi.WithFaceLandmarks<
+    { detection: faceapi.FaceDetection },
+    faceapi.FaceLandmarks68
+  >
+>;
 
-const IdentityVerification = () => {
+const IdentityVerification: React.FC<ComponentStepProps> = ({
+  handleNext,
+  activeStep,
+}) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const detectionIntervalRef = useRef<number | null>(null);
   const isDetectingRef = useRef(false);
+  const modelsLoadedRef = useRef(false);
+  const [isVerified, setIsVerified] = useState(false);
 
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [modelError, setModelError] = useState<string | null>(null);
-
-  const [detections, setDetections] = useState<
-    FaceDetectionWithExpressions[]
-  >([]);
-
+  const [detections, setDetections] = useState<FaceDetectionWithExpressions[]>(
+    [],
+  );
   const [verificationStep, setVerificationStep] =
     useState<VerificationStep>("document");
+  const [isModelLoading, setIsModelLoading] = useState(false);
 
-  const { mutate: uploadDocument } = useUploadDocumentMutation();
-  const { mutate: faceRecognationVerify } = useFaceRecognationMutation();
+  const { mutate: uploadDocument, isPending: isUploadPending } =
+    useUploadDocumentMutation();
+
+  const { mutate: faceRecognationVerify, isPending: isFaceRecognationPending } =
+    useFaceRecognationMutation();
 
   const handleDocumentContinue = (file: File) => {
-    uploadDocument(file);
-    
-    setVerificationStep("selfie");
+    uploadDocument(file, {
+      onSuccess: (res) => {
+        const userInfo = sessionStorage.getItem("userInfo");
+        const parsedUserInfo = userInfo ? JSON.parse(userInfo) : {};
+
+        sessionStorage.setItem(
+          "userInfo",
+          JSON.stringify({
+            ...parsedUserInfo,
+            public_id: res.data.public_id,
+          }),
+        );
+
+        setVerificationStep("selfie");
+      },
+      onError: (error) => {
+        console.error("Document upload failed:", error);
+      },
+    });
   };
 
   const handleSelfieCaptured = (data: FormData) => {
     faceRecognationVerify(data, {
       onSuccess: (res) => {
         console.log(res);
+        if (res.data.success && res.data.matched) {
+          setIsVerified(true);
+        }
       },
-      onError: (err) => {
-        console.log(err);        
-      }
-    })
+      onError: (error) => {
+        console.error("Face verification failed:", error);
+      },
+    });
+  };
+
+  const handleContinue = () => {
+    sessionStorage.setItem("activeStep", String(Number(activeStep) + 1));
+    handleNext?.();
   };
 
   useEffect(() => {
+    if (verificationStep !== "selfie") return;
+
     let cancelled = false;
 
     const loadModels = async () => {
-      try {
-        const MODEL_URL = `${import.meta.env.BASE_URL}models`;
+      setIsModelLoading(true);
 
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+      try {
+        const modelUrl = `${import.meta.env.BASE_URL}models`;
+
+        await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl);
+        await faceapi.nets.faceExpressionNet.loadFromUri(modelUrl);
 
         if (!cancelled) {
-          setModelsLoaded(true);
+          modelsLoadedRef.current = true;
         }
       } catch (error) {
         console.error("Failed to load face-api.js models:", error);
-
+      } finally {
         if (!cancelled) {
-          setModelError(
-            "Unable to load face detection models. Please try again later.",
-          );
+          setIsModelLoading(false);
         }
       }
     };
@@ -83,21 +114,17 @@ const IdentityVerification = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [verificationStep]);
 
   const handleVideoOnPlay = () => {
-    if (!modelsLoaded || detectionIntervalRef.current !== null) {
+    if (!modelsLoadedRef.current || detectionIntervalRef.current !== null) {
       return;
     }
 
     detectionIntervalRef.current = window.setInterval(async () => {
       const video = videoRef.current;
 
-      if (
-        !video ||
-        video.readyState < 2 ||
-        isDetectingRef.current
-      ) {
+      if (!video || video.readyState < 2 || isDetectingRef.current) {
         return;
       }
 
@@ -105,10 +132,7 @@ const IdentityVerification = () => {
 
       try {
         const results = await faceapi
-          .detectAllFaces(
-            video,
-            new faceapi.TinyFaceDetectorOptions(),
-          )
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks()
           .withFaceExpressions();
 
@@ -133,25 +157,24 @@ const IdentityVerification = () => {
   return (
     <>
       {verificationStep === "document" && (
-        <DocumentUpload onContinue={handleDocumentContinue} />
+        <DocumentUpload
+          onContinue={handleDocumentContinue}
+          isUploadPending={isUploadPending}
+        />
       )}
 
-      {verificationStep === "selfie" && (
-        <>
-          {modelError ? (
-            <p role="alert">{modelError}</p>
-          ) : !modelsLoaded ? (
-            <p>Loading face detection models...</p>
-          ) : (
-            <FaceRecognation
-              videoRef={videoRef}
-              handleVideoOnPlay={handleVideoOnPlay}
-              detections={detections}
-              handleSelfieCaptured={handleSelfieCaptured}
-            />
-          )}
-        </>
-      )}
+      {verificationStep === "selfie" &&
+        (isModelLoading ? (
+          <p>Loading face detection models...</p>
+        ) : isVerified ? <VerificationSuccess handleContinue={handleContinue} /> : (
+          <FaceRecognation
+            videoRef={videoRef}
+            handleVideoOnPlay={handleVideoOnPlay}
+            detections={detections}
+            handleSelfieCaptured={handleSelfieCaptured}
+            isFaceRecognationPending={isFaceRecognationPending}
+          />
+        ))}
     </>
   );
 };

@@ -1,15 +1,23 @@
-import { useEffect } from 'react';
-import * as faceapi from 'face-api.js';
-import type { FaceDetectionWithExpressions } from '.';
+import { useEffect } from "react";
+import * as faceapi from "face-api.js";
+import type { FaceDetectionWithExpressions } from ".";
+import { Box, Button, Stack, Typography } from "@mui/material";
 
 interface FaceRecognitionProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   handleVideoOnPlay: () => void;
   detections: FaceDetectionWithExpressions[];
   handleSelfieCaptured: (data: FormData) => void;
+  isFaceRecognationPending: boolean;
 }
 
-const FaceRecognition: React.FC<FaceRecognitionProps> = ({ videoRef, handleVideoOnPlay, detections, handleSelfieCaptured }) => {
+const FaceRecognition: React.FC<FaceRecognitionProps> = ({
+  videoRef,
+  handleVideoOnPlay,
+  detections,
+  handleSelfieCaptured,
+  isFaceRecognationPending,
+}) => {
   useEffect(() => {
     const startVideo = () => {
       navigator.mediaDevices
@@ -29,7 +37,7 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ videoRef, handleVideo
     const video = videoRef.current;
 
     if (video) {
-      video.addEventListener('play', () => {
+      video.addEventListener("play", () => {
         const canvas = faceapi.createCanvasFromMedia(video);
         const displaySize = {
           width: video.width,
@@ -38,9 +46,12 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ videoRef, handleVideo
         faceapi.matchDimensions(canvas, displaySize);
 
         const drawDetections = () => {
-          const context = canvas.getContext('2d');
+          const context = canvas.getContext("2d");
           context?.clearRect(0, 0, canvas.width, canvas.height);
-          const resizedDetections = faceapi.resizeResults(detections, displaySize);
+          const resizedDetections = faceapi.resizeResults(
+            detections,
+            displaySize,
+          );
           faceapi.draw.drawDetections(canvas, resizedDetections);
           faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
           faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
@@ -57,11 +68,11 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ videoRef, handleVideo
     const video = videoRef.current;
 
     if (video) {
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext("2d");
       context?.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       // Draw detections and expressions on the canvas
@@ -75,10 +86,10 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ videoRef, handleVideo
         faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
       }
 
-      const dataUrl = canvas.toDataURL('image/jpeg');
+      const dataUrl = canvas.toDataURL("image/jpeg");
 
-      const byteString = atob(dataUrl.split(',')[1]);
-      const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
+      const byteString = atob(dataUrl.split(",")[1]);
+      const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0];
       const ab = new ArrayBuffer(byteString.length);
       const ia = new Uint8Array(ab);
       for (let i = 0; i < byteString.length; i++) {
@@ -87,27 +98,41 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ videoRef, handleVideo
       const blob = new Blob([ab], { type: mimeString });
 
       const formData = new FormData();
-      formData.append('image', blob, 'capture.jpg');
+      formData.append("image", blob, "capture.jpg");
 
       handleSelfieCaptured(formData);
     }
   };
 
   return (
-    <div className="face-recognition-container">
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        onPlay={handleVideoOnPlay}
-        width="720"
-        height="560"
-        className="video-stream"
-      />
-      <button onClick={captureImage} className="capture-button">
-        Capture Image
-      </button>
-    </div>
+    <Stack spacing={3}>
+      <Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Position your face inside the frame and capture a clear selfie to
+          verify your identity.
+        </Typography>
+      </Box>
+      <Box sx={{ p: 2 }} className="face-recognition-container">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          onPlay={handleVideoOnPlay}
+          width="720"
+          height="560"
+          className="video-stream"
+        />
+        <Button
+          variant="contained"
+          size="medium"
+          onClick={captureImage}
+          disabled={isFaceRecognationPending}
+          sx={{ mt: 2, width: "50%" }}
+        >
+          {!isFaceRecognationPending ? "Capture Image" : "Processing..."}
+        </Button>
+      </Box>
+    </Stack>
   );
 };
 
