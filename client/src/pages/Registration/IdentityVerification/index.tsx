@@ -6,7 +6,7 @@ import FaceRecognation from "./FaceRecognation";
 import { useUploadDocumentMutation } from "../../../mutations/uploadDocument";
 import { useFaceRecognationMutation } from "../../../mutations/faceRecognation";
 import type { ComponentStepProps } from "../types";
-import VerificationSuccess from "./VerificationSuccess";
+import { FaceVerificationResult } from "./VerificationSuccess";
 
 type VerificationStep = "document" | "selfie";
 
@@ -25,7 +25,6 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
   const detectionIntervalRef = useRef<number | null>(null);
   const isDetectingRef = useRef(false);
   const modelsLoadedRef = useRef(false);
-  const [isVerified, setIsVerified] = useState(false);
 
   const [detections, setDetections] = useState<FaceDetectionWithExpressions[]>(
     [],
@@ -37,8 +36,13 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
   const { mutate: uploadDocument, isPending: isUploadPending } =
     useUploadDocumentMutation();
 
-  const { mutate: faceRecognationVerify, isPending: isFaceRecognationPending } =
-    useFaceRecognationMutation();
+  const {
+    mutate: faceRecognationVerify,
+    isPending: isFaceRecognationPending,
+    isError: isFaceRecognationError,
+    isSuccess: isFaceRecognationSuccess,
+    reset: resetFaceRecognation,
+  } = useFaceRecognationMutation();
 
   const handleDocumentContinue = (file: File) => {
     uploadDocument(file, {
@@ -63,22 +67,17 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
   };
 
   const handleSelfieCaptured = (data: FormData) => {
-    faceRecognationVerify(data, {
-      onSuccess: (res) => {
-        console.log(res);
-        if (res.data.success && res.data.matched) {
-          setIsVerified(true);
-        }
-      },
-      onError: (error) => {
-        console.error("Face verification failed:", error);
-      },
-    });
+    faceRecognationVerify(data);
   };
 
   const handleContinue = () => {
     sessionStorage.setItem("activeStep", String(Number(activeStep) + 1));
     handleNext?.();
+  };
+
+  const handleRetake = () => {
+    resetFaceRecognation();
+    setDetections([]);
   };
 
   useEffect(() => {
@@ -166,7 +165,17 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
       {verificationStep === "selfie" &&
         (isModelLoading ? (
           <p>Loading face detection models...</p>
-        ) : isVerified ? <VerificationSuccess handleContinue={handleContinue} /> : (
+        ) : isFaceRecognationSuccess ? (
+          <FaceVerificationResult
+            isSuccess={isFaceRecognationSuccess}
+            handleContinue={handleContinue}
+          />
+        ) : isFaceRecognationError ? (
+          <FaceVerificationResult
+            isError={isFaceRecognationError}
+            handleRetake={handleRetake}
+          />
+        ) : (
           <FaceRecognation
             videoRef={videoRef}
             handleVideoOnPlay={handleVideoOnPlay}
