@@ -30,6 +30,7 @@ import { ContactDetailsDto } from './dtos/contact-details.dto';
 import { OtpDto } from './dtos/otp.dto';
 import { AddressDetailsDto } from './dtos/address-details.dto';
 import { FaceRecognitionDto } from './dtos/face-recognation.dto';
+import { ConfirmPasswordDto } from './dtos/confirm-password.dto';
 
 @Controller('registration')
 export class RegistrationController {
@@ -184,7 +185,7 @@ export class RegistrationController {
     );
   }
 
-  @Post('face-recognation')
+  @Post('/face-recognation')
   @ApiOperation({
     summary: 'Verify user identity using facial recognition',
     description:
@@ -220,6 +221,17 @@ export class RegistrationController {
     return this.registrationService.verifyFaceRecognition(
       registrationToken,
       file,
+    );
+  }
+
+  @Post('/confirm-password')
+  handleConfirmPassword(
+    @Body() body: ConfirmPasswordDto,
+    @Headers('x-registration-token') registrationToken: string,
+  ) {
+    return this.registrationService.handleConfirmPassword(
+      body,
+      registrationToken,
     );
   }
 }

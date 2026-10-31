@@ -14,9 +14,9 @@ const ContactDetails: React.FC<ComponentStepProps> = ({
   setIsOtpFlow,
   activeStep,
 }) => {
-  const contactDetailSchema = createContactDetailSchema();
   const { mutate } = useContactDetails();
-
+  
+  const contactDetailSchema = createContactDetailSchema();
   type ContactDetailFormValues = z.infer<typeof contactDetailSchema>;
 
   const userInfo = sessionStorage.getItem("userInfo");

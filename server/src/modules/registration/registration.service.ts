@@ -21,6 +21,7 @@ import { RegistrationSession } from './types/registration-session.interface';
 import { AddressDetailsDto } from './dtos/address-details.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { FaceRecognationService } from './face-recognation.service';
+import { ConfirmPasswordDto } from './dtos/confirm-password.dto';
 
 @Injectable()
 export class RegistrationService {
@@ -169,5 +170,10 @@ export class RegistrationService {
     }
 
     throw new BadRequestException('Selfie image buffer is missing');
+  }
+
+  handleConfirmPassword(body: ConfirmPasswordDto, registrationToken: string) {
+    console.log(body);
+    console.log(registrationToken);
   }
 }

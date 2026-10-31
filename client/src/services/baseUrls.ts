@@ -8,4 +8,4 @@ export const VERIFY_OTP_BASE_URL = 'verify-otp';
 export const RESEND_OTP_BASE_URL = 'resend-otp';
 export const ADDRESS_DETAILS_BASE_URL = 'address-details';
 export const IDENTITY_VERIFICATION_BASE_URL = 'identity-verification';
-export const SECURITY_BASE_URL = 'security';
+export const CONFIRM_PASSWORD_BASE_URL = 'confirm-password';

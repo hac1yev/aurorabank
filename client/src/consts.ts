@@ -7,8 +7,11 @@ import PersonalDetails from "./pages/Registration/PersonalDetails";
 export const QUERY_STALE_TIME = 1000 * 60 * 5;
 
 // REGEX Patterns
-export const NAME_REGEX = /^(?=(?:.*[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż]){2,})[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż -]+$/;
+export const NAME_REGEX =
+  /^(?=(?:.*[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż]){2,})[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż -]+$/;
 export const PHONE_E164_REGEX = /^\+[1-9]\d{1,14}$/;
+export const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-+=/\\[\]`~;'])\S{8,}$/;
 
 // Registration Steps
 export const steps = [

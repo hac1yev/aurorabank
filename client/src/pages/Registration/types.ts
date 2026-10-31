@@ -26,3 +26,8 @@ export interface IAddressDetails {
     country: string;
     postalCode: string;
 }
+
+export interface IConfirmPassword {
+    password: string;
+    confirmPassword: string;
+}
