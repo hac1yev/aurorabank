@@ -172,8 +172,14 @@ export class RegistrationService {
     throw new BadRequestException('Selfie image buffer is missing');
   }
 
-  handleConfirmPassword(body: ConfirmPasswordDto, registrationToken: string) {
-    console.log(body);
-    console.log(registrationToken);
+  async handleConfirmPassword(
+    body: ConfirmPasswordDto,
+    registrationToken: string,
+  ) {
+    await this.consentService.storePassword(registrationToken, body.password);
+
+    await this.consentService.persistConsentToDb(registrationToken);
+
+    return { success: true, registrationToken };
   }
 }

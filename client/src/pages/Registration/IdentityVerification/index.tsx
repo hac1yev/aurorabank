@@ -67,7 +67,11 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
   };
 
   const handleSelfieCaptured = (data: FormData) => {
-    faceRecognationVerify(data);
+    faceRecognationVerify(data, {
+      onSuccess: () => {
+        stopCamera();
+      },
+    });
   };
 
   const handleContinue = () => {
@@ -78,6 +82,20 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
   const handleRetake = () => {
     resetFaceRecognation();
     setDetections([]);
+  };
+
+  const stopCamera = () => {
+    const video = videoRef.current;
+
+    if (video?.srcObject) {
+      const stream = video.srcObject as MediaStream;
+
+      stream.getTracks().forEach((track) => {
+        track.stop();
+      });
+
+      video.srcObject = null;
+    }
   };
 
   useEffect(() => {
@@ -114,6 +132,17 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
       cancelled = true;
     };
   }, [verificationStep]);
+
+  useEffect(() => {
+    return () => {
+      if (detectionIntervalRef.current !== null) {
+        window.clearInterval(detectionIntervalRef.current);
+        detectionIntervalRef.current = null;
+      }
+
+      stopCamera();
+    };
+  }, []);
 
   const handleVideoOnPlay = () => {
     if (!modelsLoadedRef.current || detectionIntervalRef.current !== null) {

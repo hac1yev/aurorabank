@@ -19,18 +19,29 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({
   isFaceRecognationPending,
 }) => {
   useEffect(() => {
-    const startVideo = () => {
-      navigator.mediaDevices
-        .getUserMedia({ video: {} })
-        .then((stream) => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        })
-        .catch((err) => console.error(err));
+    let stream: MediaStream;
+
+    const startVideo = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        } else {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      } catch (error) {
+        console.error("Camera initialization failed:", error);
+      }
     };
 
     startVideo();
+
+    return () => {
+      stream?.getTracks().forEach((track) => track.stop());
+    };
   }, [videoRef]);
 
   useEffect(() => {

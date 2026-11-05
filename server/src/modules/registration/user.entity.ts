@@ -22,4 +22,31 @@ export class User {
 
   @Column()
   consent!: boolean;
+
+  @Column()
+  email!: string;
+
+  @Column()
+  phone!: string;
+
+  @Column()
+  address!: string;
+
+  @Column()
+  city!: string;
+
+  @Column()
+  country!: string;
+
+  @Column()
+  postalCode!: string;
+
+  @Column()
+  public_id!: string;
+
+  @Column()
+  password!: string;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  updatedAt!: Date;
 }

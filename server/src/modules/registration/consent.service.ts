@@ -12,11 +12,11 @@ import { Repository } from 'typeorm';
 import { PersonalDetailsDto } from './dtos/personal-details.dto';
 import { DeleteRegistrationSessionDto } from './dtos/delete-session.dto';
 import { DeleteRegistrationSessionResponseDto } from './dtos/delete-session-response.dto';
-import { CompleteRegistrationDto } from './dtos/complete.dto';
 import { CompleteRegistrationResponseDto } from './dtos/complete-response.dto';
 import { RegistrationSession } from './types/registration-session.interface';
 import { ContactDetailsDto } from './dtos/contact-details.dto';
 import { AddressDetailsDto } from './dtos/address-details.dto';
+import { hashPassword } from 'src/utils';
 
 @Injectable()
 export class ConsentService {
@@ -147,6 +147,35 @@ export class ConsentService {
     }
   }
 
+  async storePassword(registrationToken: string, password: string) {
+    const key = this.getRedisKey(registrationToken);
+
+    const existing: RegistrationSession | null =
+      await this.getConsentFromRedis<RegistrationSession>(registrationToken);
+
+    if (!existing) {
+      throw new NotFoundException('Registration session not found or expired');
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    const payload: RegistrationSession = {
+      ...existing,
+      password: hashedPassword,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      const encrypted = this.aesGcm.encryptJson(payload);
+      await this.redisService.set(key, encrypted, this.ttlSeconds);
+    } catch (error) {
+      throw new InternalServerErrorException({
+        message: 'Failed to store password in Redis',
+        cause: error as Error,
+      });
+    }
+  }
+
   async getConsentFromRedis<T = any>(
     registrationToken: string,
   ): Promise<T | null> {
@@ -180,30 +209,26 @@ export class ConsentService {
   }
 
   async persistConsentToDb(
-    dto: CompleteRegistrationDto,
+    registrationToken: string,
   ): Promise<CompleteRegistrationResponseDto> {
-    const { registrationToken } = dto;
-
     const session =
       await this.getConsentFromRedis<RegistrationSession>(registrationToken);
 
     if (!session) {
       throw new NotFoundException('Session expired');
     }
-    if (!session.consentTimestamp) {
-      throw new NotFoundException('Consent timestamp missing ');
-    }
-
-    const consentDate = new Date(session.consentTimestamp);
 
     try {
       await this.userRepo.save({
         ...session.personalDetails,
         ...session.addressDetails,
         ...session.contacts,
-        consentTimestamp: consentDate,
+        public_id: session.public_id,
+        password: session.password,
+        updatedAt: new Date(session.updatedAt!),
       });
-      await this.deleteConsentFromRedis(dto);
+
+      await this.deleteConsentFromRedis({ registrationToken });
       return { status: 'completed' };
     } catch (err: any) {
       throw new InternalServerErrorException({

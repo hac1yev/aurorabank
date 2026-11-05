@@ -9,10 +9,12 @@ import { RHFTextfield } from "../../../components/rhf/Textfield";
 import { createConfirmPasswordSchema } from "../schema/ConfirmPasswordSchema";
 import type z from "zod/v3";
 import { useConfirmPasswordMutation } from "../../../mutations/confirmPassword";
+import { useNavigate } from "react-router-dom";
 
 const ConfirmPassword = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const navigate = useNavigate();
 
   const { mutate } = useConfirmPasswordMutation();
 
@@ -41,10 +43,10 @@ const ConfirmPassword = () => {
   const onSubmit = (data: ConfirmPasswordFormValues) => {
     mutate(data, {
       onSuccess: (res) => {
-        console.log(res);
-      },
-      onError: (err) => {
-        console.log(err);
+        if(res.status) {
+          sessionStorage.clear();
+          navigate("/login");
+        }
       }
     })
   };
