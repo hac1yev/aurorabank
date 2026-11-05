@@ -10,7 +10,10 @@ import { databaseConfig } from 'src/config/database.config';
       useFactory: () => ({
         ...databaseConfig(),
         autoLoadEntities: true,
+
+        migrations: [__dirname + '/../database/migrations/*.{js,ts}'],
         migrationsRun: true, // ✅ auto-run migrations on app start
+        synchronize: false, // ❌ never use TRUE in production
       }),
     }),
   ],

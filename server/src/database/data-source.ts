@@ -2,15 +2,8 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { databaseConfig } from '../config/database.config';
 
-const config = databaseConfig();
-
 export const dataSource = new DataSource({
-  type: 'postgres',
-  host: config.host,
-  port: config.port,
-  username: config.username,
-  password: config.password,
-  database: config.database,
+  ...databaseConfig(),
 
   // Fix: Explicitly point to src for development AND dist for production
   entities: [__dirname + '/../modules/**/*.entity.{js,ts}'],
