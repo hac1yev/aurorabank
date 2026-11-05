@@ -1,10 +1,23 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
+# Install native dependencies required by canvas and TensorFlow
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    pkg-config \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY . .
 

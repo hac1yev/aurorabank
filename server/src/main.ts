@@ -14,8 +14,14 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins = [
+    'http://localhost:5173',
+    process.env.FRONTEND_URL,
+  ].filter((origin): origin is string => Boolean(origin));
+
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: allowedOrigins,
+    credentials: true,
   });
 
   const swaggerConfig = new DocumentBuilder()
@@ -32,7 +38,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('/api/v1/openapi', app, document);
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 bootstrap().catch((err) => {
   console.error(err);
