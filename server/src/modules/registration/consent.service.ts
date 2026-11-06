@@ -232,7 +232,7 @@ export class ConsentService {
       return { status: 'completed' };
     } catch (err: any) {
       throw new InternalServerErrorException({
-        message: 'Failed to persist consent to DB',
+        message: err.message || 'Failed to persist consent to database',
         cause: err as Error,
       });
     }
