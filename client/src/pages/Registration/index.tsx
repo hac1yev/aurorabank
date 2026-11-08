@@ -11,7 +11,7 @@ import OtpVerification from "./OtpVerification";
 
 export const RegistrationStepper = () => {
   const [isOtpFlow, setIsOtpFlow] = React.useState(false);
-  const { activeStep, completed, allStepsCompleted, handleStep, handleNext } =
+  const { activeStep, completed, allStepsCompleted, handleNext } =
     useStepperNavigation();
 
   const CurrentStepComponent = steps[activeStep].Component;
@@ -60,7 +60,6 @@ export const RegistrationStepper = () => {
                 <StepButton
                   aria-controls="stepper-content"
                   color="inherit"
-                  onClick={handleStep(index)}
                 >
                   {item.label}
                 </StepButton>
