@@ -1,9 +1,19 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { RedisService } from 'src/shared/modules/redis/redis.service';
+import { consumeRateLimit } from 'src/shared/utils/rate-limit.util';
+import {
+  PERSONAL_DETAILS_EDIT_LIMIT,
+  PERSONAL_DETAILS_EDIT_WINDOW_SECONDS,
+  PERSONAL_DETAILS_IP_LIMIT,
+  PERSONAL_DETAILS_IP_WINDOW_SECONDS,
+} from 'src/shared/constants/rate-limit.constants';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
@@ -34,17 +44,67 @@ export class RegistrationService {
     private mailService: MailService,
     private cloudinaryService: CloudinaryService,
     private faceRecognationService: FaceRecognationService,
+    private redisService: RedisService,
   ) {}
 
   async handlePersonalDetailsStep(
     personalDetails: PersonalDetailsDto,
+    clientIp: string,
   ): Promise<RegistrationStepOneResponseDto> {
+    // Tokens are free to create, so limit how many a single client IP can start.
+    const retryAfter = await consumeRateLimit(
+      this.redisService,
+      `registration:ip:${clientIp}`,
+      PERSONAL_DETAILS_IP_LIMIT,
+      PERSONAL_DETAILS_IP_WINDOW_SECONDS,
+    );
+    if (retryAfter !== null) {
+      throw new HttpException(
+        {
+          code: 'PERSONAL_DETAILS_RATE_LIMITED',
+          message: `Too many registration attempts. Try again in ${retryAfter} seconds.`,
+          retryAfter,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const registrationToken = uuidv4();
     const consentTimestamp = new Date().toISOString();
 
     await this.consentService.storeConsent(
       registrationToken,
       consentTimestamp,
+      personalDetails,
+    );
+
+    return { status: 'ok', registrationToken };
+  }
+
+  /** Updates personal details in an existing session. The token is never regenerated. */
+  async handleUpdatePersonalDetails(
+    personalDetails: PersonalDetailsDto,
+    registrationToken: string,
+  ) {
+    const retryAfter = await consumeRateLimit(
+      this.redisService,
+      `registration:edit:${registrationToken}`,
+      PERSONAL_DETAILS_EDIT_LIMIT,
+      PERSONAL_DETAILS_EDIT_WINDOW_SECONDS,
+    );
+    if (retryAfter !== null) {
+      throw new HttpException(
+        {
+          code: 'PERSONAL_DETAILS_EDIT_RATE_LIMITED',
+          message: `Too many edits to your personal details. Try again in ${retryAfter} seconds.`,
+          retryAfter,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    await this.consentService.updatePersonalDetails(
+      registrationToken,
       personalDetails,
     );
 
@@ -116,6 +176,9 @@ export class RegistrationService {
 
       return res;
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         error,
         'Failed to extract passport information from OCR',
@@ -134,6 +197,12 @@ export class RegistrationService {
 
     if (!session) {
       throw new NotFoundException('Session expired');
+    }
+
+    if (!session.documentVerified) {
+      throw new BadRequestException(
+        'Passport document has not been verified. Please upload your passport first.',
+      );
     }
 
     const publicId = session.public_id;

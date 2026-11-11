@@ -16,8 +16,9 @@ class HttpClient {
   public get = (url: string, config?: AxiosRequestConfig) =>
     this.client.get(url, config);
 
-  public post = (url: string, data?: any, config?: AxiosRequestConfig) =>
-    this.client.post(url, data, config);
+  public post = (url: string, data?: any, config?: AxiosRequestConfig) => {
+    return this.client.post(url, data, config);
+  }
 
   public put = (url: string, data?: any, config?: AxiosRequestConfig) =>
     this.client.put(url, data, config);

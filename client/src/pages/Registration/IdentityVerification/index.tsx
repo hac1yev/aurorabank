@@ -7,6 +7,8 @@ import { useUploadDocumentMutation } from "../../../mutations/uploadDocument";
 import { useFaceRecognationMutation } from "../../../mutations/faceRecognation";
 import type { ComponentStepProps } from "../types";
 import { FaceVerificationResult } from "./VerificationSuccess";
+import { getApiError } from "../../../utils/apiError";
+import { restartRegistration } from "../../../utils/registrationSession";
 
 type VerificationStep = "document" | "selfie";
 
@@ -20,6 +22,7 @@ export type FaceDetectionWithExpressions = faceapi.WithFaceExpressions<
 const IdentityVerification: React.FC<ComponentStepProps> = ({
   handleNext,
   activeStep,
+  goToStep,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const detectionIntervalRef = useRef<number | null>(null);
@@ -33,20 +36,32 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
     useState<VerificationStep>("document");
   const [isModelLoading, setIsModelLoading] = useState(false);
 
-  const { mutate: uploadDocument, isPending: isUploadPending } =
-    useUploadDocumentMutation();
+  const {
+    mutate: uploadDocument,
+    isPending: isUploadPending,
+    error: uploadError,
+    reset: resetUpload,
+  } = useUploadDocumentMutation();
 
   const {
     mutate: faceRecognationVerify,
     isPending: isFaceRecognationPending,
     isError: isFaceRecognationError,
     isSuccess: isFaceRecognationSuccess,
+    error: faceRecognationError,
     reset: resetFaceRecognation,
   } = useFaceRecognationMutation();
 
   const handleDocumentContinue = (file: File) => {
     uploadDocument(file, {
       onSuccess: (res) => {
+        const publicId: unknown = res.data.public_id;
+
+        // Only advance when the server confirmed the document (it returns public_id on success).
+        if (typeof publicId !== "string" || publicId === "") {
+          return;
+        }
+
         const userInfo = sessionStorage.getItem("userInfo");
         const parsedUserInfo = userInfo ? JSON.parse(userInfo) : {};
 
@@ -54,17 +69,52 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
           "userInfo",
           JSON.stringify({
             ...parsedUserInfo,
-            public_id: res.data.public_id,
+            public_id: publicId,
           }),
         );
 
         setVerificationStep("selfie");
       },
-      onError: (error) => {
-        console.error("Document upload failed:", error);
-      },
     });
   };
+
+  const faceError = getApiError(faceRecognationError);
+  const isDocumentNotVerified =
+    faceError.status === 400 && faceError.matched === undefined;
+  const isSessionExpired = faceError.status === 404;
+
+  const goBackToDocument = () => {
+    resetFaceRecognation();
+    resetUpload();
+    setVerificationStep("document");
+  };
+
+  const faceFailureView = isDocumentNotVerified
+    ? {
+        errorTitle: "Passport not verified",
+        errorMessage:
+          "Your passport must be verified before the selfie check. Please upload your passport again.",
+        actionLabel: "Upload passport",
+        handleAction: goBackToDocument,
+      }
+    : isSessionExpired
+      ? {
+          errorTitle: "Session expired",
+          errorMessage:
+            "Your registration session has expired. Please start again.",
+          actionLabel: "Start again",
+          handleAction: () =>
+            restartRegistration({ keepPersonalDetails: true }),
+        }
+      : faceError.matched === false
+        ? undefined // genuine face mismatch: keep the default copy and retake action
+        : {
+            errorTitle: "Something went wrong",
+            errorMessage:
+              "We could not complete the face check. Please try again.",
+            actionLabel: undefined,
+            handleAction: undefined,
+          };
 
   const handleSelfieCaptured = (data: FormData) => {
     faceRecognationVerify(data, {
@@ -188,6 +238,9 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
         <DocumentUpload
           onContinue={handleDocumentContinue}
           isUploadPending={isUploadPending}
+          uploadError={uploadError}
+          onFileChange={resetUpload}
+          onReviewPersonalDetails={() => goToStep?.(0)}
         />
       )}
 
@@ -203,6 +256,7 @@ const IdentityVerification: React.FC<ComponentStepProps> = ({
           <FaceVerificationResult
             isError={isFaceRecognationError}
             handleRetake={handleRetake}
+            {...faceFailureView}
           />
         ) : (
           <FaceRecognation

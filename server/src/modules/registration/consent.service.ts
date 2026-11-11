@@ -133,6 +133,7 @@ export class ConsentService {
     const payload: RegistrationSession = {
       ...existing,
       public_id,
+      documentVerified: true,
       updatedAt: new Date().toISOString(),
     };
 
@@ -174,6 +175,72 @@ export class ConsentService {
         cause: error as Error,
       });
     }
+  }
+
+  /**
+   * Writes the session back without changing its expiry: the remaining TTL is
+   * read first and re-applied, so updates never extend the session lifetime.
+   */
+  private async writeSessionKeepingTtl(
+    registrationToken: string,
+    session: RegistrationSession,
+  ) {
+    const key = this.getRedisKey(registrationToken);
+    const remainingSeconds = await this.redisService.ttl(key);
+
+    if (remainingSeconds <= 0) {
+      throw new NotFoundException('Registration session not found or expired');
+    }
+
+    try {
+      const encrypted = this.aesGcm.encryptJson(session);
+      await this.redisService.set(key, encrypted, remainingSeconds);
+    } catch (error) {
+      throw new InternalServerErrorException({
+        message: 'Failed to update registration session in Redis',
+        cause: error as Error,
+      });
+    }
+  }
+
+  /**
+   * Replaces only `personalDetails`. Contacts, address, password and OTP state are
+   * kept. Clears the earlier document check, since it was made against the old details.
+   */
+  async updatePersonalDetails(
+    registrationToken: string,
+    personalDetails: PersonalDetailsDto,
+  ) {
+    const existing =
+      await this.getConsentFromRedis<RegistrationSession>(registrationToken);
+
+    if (!existing) {
+      throw new NotFoundException('Registration session not found or expired');
+    }
+
+    const payload: RegistrationSession = {
+      ...existing,
+      personalDetails,
+      updatedAt: new Date().toISOString(),
+    };
+    delete payload.documentVerified;
+    delete payload.public_id;
+
+    await this.writeSessionKeepingTtl(registrationToken, payload);
+  }
+
+  async storeOcrPassportKey(registrationToken: string, ocrPassportKey: string) {
+    const existing =
+      await this.getConsentFromRedis<RegistrationSession>(registrationToken);
+
+    if (!existing) {
+      throw new NotFoundException('Registration session not found or expired');
+    }
+
+    await this.writeSessionKeepingTtl(registrationToken, {
+      ...existing,
+      ocrPassportKey,
+    });
   }
 
   async getConsentFromRedis<T = any>(

@@ -11,7 +11,7 @@ import OtpVerification from "./OtpVerification";
 
 export const RegistrationStepper = () => {
   const [isOtpFlow, setIsOtpFlow] = React.useState(false);
-  const { activeStep, completed, allStepsCompleted, handleNext } =
+  const { activeStep, completed, allStepsCompleted, handleNext, goToStep } =
     useStepperNavigation();
 
   const CurrentStepComponent = steps[activeStep].Component;
@@ -86,7 +86,7 @@ export const RegistrationStepper = () => {
                   {activeStep === 1 ? (
                     <CurrentStepComponent setIsOtpFlow={setIsOtpFlow} activeStep={activeStep} />
                   ) : (
-                    <CurrentStepComponent handleNext={handleNext} activeStep={activeStep} />
+                    <CurrentStepComponent handleNext={handleNext} goToStep={goToStep} activeStep={activeStep} />
                   )}
                 </Paper>
               </React.Fragment>

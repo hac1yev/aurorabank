@@ -3,6 +3,8 @@ import {
   Controller,
   Headers,
   HttpCode,
+  Ip,
+  Patch,
   Post,
   UploadedFile,
   UploadedFiles,
@@ -15,11 +17,14 @@ import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConsumes,
+  ApiNotFoundResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
   ApiResponse,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
   ApiUnsupportedMediaTypeResponse,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { RegistrationFilesDto } from './dtos/personal-details-request-swagger.dto';
 import { RegistrationStepOneResponseDto } from './dtos/personal-details-response';
@@ -53,9 +58,45 @@ export class RegistrationController {
       'Personal details and consent stored successfully in Redis. Registration token returned.',
     type: RegistrationStepOneResponseDto,
   })
+  @ApiTooManyRequestsResponse({
+    description:
+      'Too many registration sessions were started from this IP address.',
+  })
   @HttpCode(200)
-  handleStepOne(@Body() body: PersonalDetailsDto) {
-    return this.registrationService.handlePersonalDetailsStep(body);
+  handleStepOne(@Body() body: PersonalDetailsDto, @Ip() clientIp: string) {
+    return this.registrationService.handlePersonalDetailsStep(body, clientIp);
+  }
+
+  @Patch('/personal-details')
+  @ApiOperation({
+    summary: 'Update personal details in an existing registration session',
+    description:
+      'Replaces personal details in the current session without issuing a new token. Contacts, address, OTP state and OCR counters are kept. Any earlier document verification is cleared, so the passport must be uploaded again.',
+  })
+  @ApiBody({
+    type: PersonalDetailsDto,
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Personal details updated. The same registration token is returned.',
+  })
+  @ApiNotFoundResponse({
+    description: 'Registration session not found or expired.',
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'Too many edits to personal details for this registration session.',
+  })
+  @HttpCode(200)
+  handleUpdatePersonalDetails(
+    @Body() body: PersonalDetailsDto,
+    @Headers('x-registration-token') registrationToken: string,
+  ) {
+    return this.registrationService.handleUpdatePersonalDetails(
+      body,
+      registrationToken,
+    );
   }
 
   @Post('/contact-details')
@@ -167,12 +208,20 @@ export class RegistrationController {
   })
   @ApiBadRequestResponse({
     description:
-      'The selected file is empty. Please choose another file and try again. / The file name contains invalid characters. Please rename the file and try again. / You can upload up to 2 files at once.',
+      'The selected file is empty. Please choose another file and try again. / The file name contains invalid characters. Please rename the file and try again. / You can upload only one file at a time.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      'DOCUMENT_NOT_RECOGNIZED: the image is not a readable passport. / MISMATCH: the passport details do not match the entered personal details (response lists the mismatched field names in `fields`).',
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'OCR_RATE_LIMITED: too many document checks in a short period. / OCR_LOCKED: the passport is locked after repeated failed checks (see `retryAfter`).',
   })
   @ApiResponse({
     status: 200,
     description:
-      'Files passed validation. Registration data stored successfully in Redis.',
+      'Passport validated and stored. Returns the extracted passport fields and the stored image public_id.',
   })
   @UseInterceptors(FilesInterceptor('files', 2))
   handlePassportOcr(

@@ -7,6 +7,9 @@ export interface RegistrationSession {
   contacts?: ContactDetailsDto;
   addressDetails?: AddressDetailsDto;
   public_id?: string;
+  documentVerified?: boolean;
+  /** Keyed hash of the passport number used for OCR counters, pinned on the first OCR attempt. */
+  ocrPassportKey?: string;
   password?: string;
   updatedAt?: string;
 }

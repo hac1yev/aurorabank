@@ -36,7 +36,7 @@ export class UploadValidationPipe implements PipeTransform {
 
       if (files.length > MAX_FILE_UPLOADS) {
         throw new BadRequestException(
-          `You can upload up to ${MAX_FILE_UPLOADS} files at once.`,
+          'You can upload only one file at a time.',
         );
       }
 

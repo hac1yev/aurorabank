@@ -46,6 +46,12 @@ export const useStepperNavigation = () => {
     setActiveStep(step);
   };
 
+  // Moves to a step without changing completion state, and keeps the saved step in sync for reloads.
+  const goToStep = (step: number) => {
+    sessionStorage.setItem("activeStep", String(step));
+    setActiveStep(step);
+  };
+
   return {
     activeStep,
     completed,
@@ -56,5 +62,6 @@ export const useStepperNavigation = () => {
     handleNext,
     handleBack,
     handleStep,
+    goToStep,
   };
 };

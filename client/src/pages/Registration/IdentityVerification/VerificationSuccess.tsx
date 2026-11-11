@@ -3,6 +3,11 @@ type VerificationSuccessProps = {
   isError?: boolean;
   handleContinue?: () => void;
   handleRetake?: () => void;
+  /** Optional overrides for failures that are not a face mismatch. */
+  errorTitle?: string;
+  errorMessage?: string;
+  actionLabel?: string;
+  handleAction?: () => void;
 };
 
 export const FaceVerificationResult = ({
@@ -10,6 +15,10 @@ export const FaceVerificationResult = ({
   isError,
   handleContinue,
   handleRetake,
+  errorTitle,
+  errorMessage,
+  actionLabel,
+  handleAction,
 }: VerificationSuccessProps) => {
   return (
     <>
@@ -32,14 +41,16 @@ export const FaceVerificationResult = ({
         <div className="verification-error">
           <div className="error-icon">✕</div>
 
-          <h2>Identity Verification Failed</h2>
+          <h2>{errorTitle ?? "Identity Verification Failed"}</h2>
 
           <p>
-            Your face could not be matched with your passport photo. Please
-            ensure good lighting, keep your face centered, and try again.
+            {errorMessage ??
+              "Your face could not be matched with your passport photo. Please ensure good lighting, keep your face centered, and try again."}
           </p>
 
-          <button onClick={handleRetake}>Retake Selfie</button>
+          <button onClick={handleAction ?? handleRetake}>
+            {actionLabel ?? "Retake Selfie"}
+          </button>
         </div>
       )}
     </>

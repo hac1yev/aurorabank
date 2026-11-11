@@ -2,17 +2,52 @@ import React, { useEffect, useRef, useState } from "react";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Stack, Typography } from "@mui/material";
+import { getApiError } from "../../../utils/apiError";
+import { validateDocumentFile } from "../../../utils/documentValidation";
+import {
+  restartRegistration,
+  saveReview,
+} from "../../../utils/registrationSession";
+import { useCountdown } from "../hooks/useCountdown";
+import { describeOcrError } from "./ocrErrors";
 
 interface DocumentUploadProps {
   onContinue: (file: File) => void;
   isUploadPending: boolean;
+  /** Error from the last upload attempt (mutation error). */
+  uploadError?: unknown;
+  /** Called when a new file is chosen so the previous upload error is cleared. */
+  onFileChange?: () => void;
+  /** Moves the user back to personal details to correct mismatched fields. */
+  onReviewPersonalDetails?: () => void;
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPending }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  onContinue,
+  isUploadPending,
+  uploadError,
+  onFileChange,
+  onReviewPersonalDetails,
+}) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  const apiError = getApiError(uploadError);
+  const isBlockingCode =
+    apiError.code === "OCR_LOCKED" || apiError.code === "OCR_RATE_LIMITED";
+  const remainingSeconds = useCountdown(
+    isBlockingCode ? apiError.retryAfter : undefined,
+    uploadError,
+  );
+  const isBlocked = isBlockingCode && remainingSeconds > 0;
+  const isLocked = isUploadPending || isBlocked;
+
+  const errorView = uploadError
+    ? describeOcrError(apiError, remainingSeconds)
+    : null;
 
   useEffect(() => {
     if (!file) {
@@ -25,45 +60,65 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPen
       URL.revokeObjectURL(url);
     };
   }, [file]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) {
+    const input = event.target;
+    // Copy the selection before clearing the input (clearing may empty the FileList).
+    const selectedFiles = Array.from(input.files ?? []);
+    // Reset so choosing the same file again still fires onChange.
+    input.value = "";
+
+    if (selectedFiles.length === 0) {
       return;
     }
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "application/pdf",
-    ];
-    if (!allowedTypes.includes(selectedFile.type)) {
+
+    onFileChange?.();
+
+    if (selectedFiles.length > 1) {
+      setFileError("You can upload only one file at a time.");
       return;
     }
-    const maxSize = 10 * 1024 * 1024;
-    if (selectedFile.size > maxSize) {
+
+    const selectedFile = selectedFiles[0];
+    const reason = validateDocumentFile(selectedFile);
+    if (reason) {
+      setFileError(reason);
       return;
     }
+
+    setFileError(null);
     setFile(selectedFile);
   };
+
   const handleRemove = () => {
     setFile(null);
+    setFileError(null);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
   };
+
   const handleContinue = () => {
-    if (!file) {
+    if (!file || isLocked) {
       return;
     }
     onContinue(file);
   };
+
+  const openFilePicker = () => {
+    if (isLocked) {
+      return;
+    }
+    inputRef.current?.click();
+  };
+
   return (
     <Stack spacing={3}>
       {" "}
       <Box>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           {" "}
-          Upload your passport or ID card to verify your identity.{" "}
+          Upload the photo page of your passport to verify your identity.{" "}
         </Typography>{" "}
       </Box>{" "}
       {!file ? (
@@ -78,7 +133,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPen
             transition: "border-color 0.2s",
             "&:hover": { borderColor: "primary.main" },
           }}
-          onClick={() => inputRef.current?.click()}
+          onClick={openFilePicker}
         >
           {" "}
           <CloudUploadOutlinedIcon
@@ -86,19 +141,20 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPen
           />{" "}
           <Typography variant="body1" sx={{ fontWeight: 500 }}>
             {" "}
-            Upload your ID document{" "}
+            Upload your passport{" "}
           </Typography>{" "}
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             {" "}
-            PNG, JPG, WEBP or PDF{" "}
+            JPG, JPEG or PNG, up to 10 MB{" "}
           </Typography>{" "}
           <Button
             variant="outlined"
             sx={{ mt: 3 }}
             startIcon={<CloudUploadOutlinedIcon />}
+            disabled={isLocked}
             onClick={(event) => {
               event.stopPropagation();
-              inputRef.current?.click();
+              openFilePicker();
             }}
           >
             {" "}
@@ -108,7 +164,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPen
             ref={inputRef}
             hidden
             type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
+            accept="image/jpeg,image/png,.jpg,.jpeg,.png"
             onChange={handleFileChange}
           />{" "}
         </Box>
@@ -122,11 +178,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPen
           }}
         >
           {" "}
-          {file.type.startsWith("image/") && previewUrl ? (
+          {previewUrl ? (
             <Box
               component="img"
               src={previewUrl}
-              alt="Identity document preview"
+              alt="Passport preview"
               sx={{
                 display: "block",
                 width: "100%",
@@ -162,6 +218,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPen
               color="error"
               startIcon={<DeleteOutlineOutlinedIcon />}
               onClick={handleRemove}
+              disabled={isLocked}
             >
               {" "}
               Remove{" "}
@@ -177,15 +234,52 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onContinue, isUploadPen
           Make sure the document is clear and all information is visible.{" "}
         </Typography>{" "}
       </Stack>{" "}
+      {(fileError || errorView) && (
+        <Alert
+          severity="error"
+          action={
+            errorView?.kind === "mismatch" ? (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  saveReview(apiError.fields ?? []);
+                  onReviewPersonalDetails?.();
+                }}
+              >
+                Review personal details
+              </Button>
+            ) : errorView?.kind === "sessionExpired" ? (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() =>
+                  restartRegistration({ keepPersonalDetails: true })
+                }
+              >
+                Start again
+              </Button>
+            ) : undefined
+          }
+        >
+          {fileError ?? (
+            <>
+              <strong>{errorView?.title}</strong>
+              <br />
+              {errorView?.message}
+            </>
+          )}
+        </Alert>
+      )}{" "}
       <Button
         fullWidth
         variant="contained"
         size="large"
-        disabled={!file || isUploadPending}
+        disabled={!file || isLocked}
         onClick={handleContinue}
       >
         {" "}
-        {isUploadPending ? "Loading..." : "Continue"}
+        {isUploadPending ? "Processing..." : "Continue"}
       </Button>{" "}
     </Stack>
   );

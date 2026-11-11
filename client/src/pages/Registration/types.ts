@@ -3,6 +3,7 @@ import type { Dayjs } from "dayjs";
 export interface ComponentStepProps {
   setIsOtpFlow?: React.Dispatch<React.SetStateAction<boolean>>;
   handleNext?: () => void;
+  goToStep?: (step: number) => void;
   activeStep?: number;
 };
 

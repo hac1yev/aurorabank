@@ -1,4 +1,10 @@
-import { randomBytes, createCipheriv, createDecipheriv } from 'crypto';
+import {
+  randomBytes,
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  hkdfSync,
+} from 'crypto';
 
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
@@ -28,6 +34,18 @@ export class AesGcmHelper {
       authTag.toString('base64'),
     ];
     return parts.join(':');
+  }
+
+  /**
+   * Keyed, purpose-separated hash (HMAC-SHA256 with an HKDF-derived subkey).
+   * Used for Redis lookup keys so raw identifiers are not stored in key names.
+   * Does not change encryption behaviour.
+   */
+  keyedHash(purpose: string, value: string): string {
+    const subkey = Buffer.from(
+      hkdfSync('sha256', this.key, Buffer.alloc(0), purpose, 32),
+    );
+    return createHmac('sha256', subkey).update(value, 'utf8').digest('hex');
   }
 
   decryptToJson<T>(payload: string): T {

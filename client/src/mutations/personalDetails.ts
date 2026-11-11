@@ -8,3 +8,13 @@ export const usePersonalDetailsMutation = () => {
       personalDetailsService.sendPersonalDetails(personalDetails),
   });
 };
+
+export const useUpdatePersonalDetailsMutation = () => {
+  return useMutation({
+    mutationFn: (personalDetails: IPersonalDetails) =>
+      personalDetailsService.updatePersonalDetails(
+        sessionStorage.getItem("registrationToken"),
+        personalDetails,
+      ),
+  });
+};

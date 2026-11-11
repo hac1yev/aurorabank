@@ -15,12 +15,15 @@ export const RHFDatepicker = <T extends FieldValues>({ name, ...props }: Props<T
       <Controller
         name={name}
         control={control}
-        render={({ field }) => (
+        render={({ field, fieldState: { error } }) => (
           <DatePicker
             {...field}
             {...props}
             value={field.value}
             onChange={field.onChange}
+            slotProps={{
+              textField: { error: !!error, helperText: error?.message },
+            }}
           />
         )}
       />
